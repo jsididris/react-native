@@ -1,8 +1,9 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
+ * Modified to avoid crash
  */
 
 #import <Foundation/Foundation.h>
@@ -72,6 +73,17 @@ RCT_EXTERN_C_END
 RCT_EXTERN void RCTRegisterModule(Class); \
 + (NSString *)moduleName { return @#js_name; } \
 + (void)load { RCTRegisterModule(self); }
+
+/**
+ * Same as RCT_EXPORT_MODULE, but uses __attribute__((constructor)) for module
+ * registration. Useful for registering swift classes that forbids use of load
+ * Used in RCT_EXTERN_REMAP_MODULE
+ */
+#define RCT_EXPORT_MODULE_NO_LOAD(js_name, objc_name) \
+RCT_EXTERN void RCTRegisterModule(Class); \
++ (NSString *)moduleName { return @#js_name; } \
+__attribute__((constructor)) static void \
+RCT_CONCAT(initialize_, objc_name)() { RCTRegisterModule([objc_name class]); }
 
 /**
  * To improve startup performance users may want to generate their module lists
@@ -250,7 +262,7 @@ RCT_EXTERN void RCTRegisterModule(Class); \
   @interface objc_name (RCTExternModule) <RCTBridgeModule> \
   @end \
   @implementation objc_name (RCTExternModule) \
-  RCT_EXPORT_MODULE(js_name)
+  RCT_EXPORT_MODULE_NO_LOAD(js_name, objc_name)
 
 /**
  * Use this macro in accordance with RCT_EXTERN_MODULE to export methods
@@ -301,7 +313,7 @@ RCT_EXTERN void RCTRegisterModule(Class); \
  * for the lifetime of the bridge, so it is not suitable for returning dynamic values, but may be used for long-lived
  * values such as session keys, that are regenerated only as part of a reload of the entire React application.
  *
- * If you implement this method and do not implement `requiresMainThreadSetup`, you will trigger deprecated logic
+ * If you implement this method and do not implement `requiresMainQueueSetup`, you will trigger deprecated logic
  * that eagerly initializes your module on bridge startup. In the future, this behaviour will be changed to default
  * to initializing lazily, and even modules with constants will be initialized lazily.
  */
